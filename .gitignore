@@ -6,6 +6,16 @@
 bin/
 obj/
 
+# Secrets — never committed
+appsettings.Development.json
+appsettings.*.json
+!appsettings.json
+.env
+*.pfx
+*.p12
+local.settings.json
+secrets.json
+
 # Common node modules locations
 /node_modules
 /wwwroot/node_modules
