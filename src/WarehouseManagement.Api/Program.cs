@@ -8,6 +8,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Add services to the container.
+builder.Services.AddControllers();
 builder.Services.AddScoped<ProductService>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -20,6 +21,8 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+app.MapControllers();
 
 app.UseHttpsRedirection();
 
