@@ -30,14 +30,10 @@ public class ProductService
 
     public async Task<ProductStockResponse> IncreaseStockAsync(int productId, ProductStockRequest request)
     {
-        var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == productId);
-
-        if (product == null)
-            throw new NullReferenceException("The product doesn't exist");
-
+        var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == productId) ?? throw new NullReferenceException("The product doesn't exist");
+        
         if (request.StockQuantity <= 0)
             throw new ArgumentException("The quantity must be greater than zero");
-            _logger.LogWarning("User tries to add stock to a non-existant product.");
 
         product.StockQuantity += request.StockQuantity;
         await _context.SaveChangesAsync();

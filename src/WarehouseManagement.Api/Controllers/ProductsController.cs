@@ -36,14 +36,14 @@ namespace WarehouseManagement.Api.Controllers
             {
                 return await _service.IncreaseStockAsync(productId, request);
             }
-            catch (Exception ex)
+            catch (NullReferenceException)
             {
-                _logger.LogError(ex, "Error increasing stock quantity");
-                
-                return StatusCode(500, new
-                {
-                    Message = "An unexpected error ocurred"
-                });
+                _logger.LogWarning("User tries to add stock to a non-existant product.");
+                return NotFound();
+            }
+            catch (ArgumentException)
+            {
+                return BadRequest();
             }
         }
     }

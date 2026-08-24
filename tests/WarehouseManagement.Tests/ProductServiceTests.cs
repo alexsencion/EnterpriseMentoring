@@ -86,16 +86,6 @@ public class ProductServiceTests : IClassFixture<SqliteTestFixture>
         // Arrange
         await using var context = _fixture.CreateContext();
 
-         context.Products.Add(new Product
-            {
-                Id = 3,
-                Name = "Product 01",
-                Sku = "Sku-001",
-                StockQuantity = 10
-            });
-
-            await context.SaveChangesAsync();
-
         var service = new ProductService(context, _loggerMock.Object);
 
         // Act
