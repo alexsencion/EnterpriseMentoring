@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using WarehouseManagement.Api.Data;
 using WarehouseManagement.Api.Domain.Entites;
+using WarehouseManagement.Api.DTOs;
 
 namespace WarehouseManagement.Api.Services;
 
@@ -17,15 +18,40 @@ public class ProductService
         _logger = logger;
     }
 
-    public async Task<List<ProductDto>> GetProductsAsync()
-    {
-        return await _context.Products.Select(p => new ProductDto
+    public async Task<PagedResult<ProductDto>> GetAllAsync(ProductQueryParameters query, CancellationToken cancellationToken)
+    {        
+        IQueryable<Product> products = _context.Products;
+
+        if (!string.IsNullOrWhiteSpace(query.SearchTerm))
         {
-            ProductId = p.Id,
-            Name = p.Name,
-            Sku = p.Sku,
-            StockQuantity = p.StockQuantity
-        }).ToListAsync();
+            var search = query.SearchTerm.ToLower();
+            products = _context.Products.Where(x => x.Name.ToLower().Contains(search));
+        }
+
+        if (query.PageNumber <= 0)
+            query.PageNumber = 1;
+
+        if (query.PageSize > 50)
+            query.PageSize = 50;
+
+        var totalCount = products.Count();
+        var pageNumber = query.PageNumber;
+        var pageSize = query.ClampedPageSize;
+        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        var paged = await products
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var response = paged.Select(product => new ProductDto
+        {
+            ProductId = product.Id,
+            Name = product.Name,
+            StockQuantity = product.StockQuantity
+        });
+
+        return new PagedResult<ProductDto>(response, totalCount, totalPages, pageNumber, pageSize);
     }
 
     public async Task<ProductStockResponse> IncreaseStockAsync(int productId, ProductStockRequest request)
