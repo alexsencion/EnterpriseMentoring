@@ -25,7 +25,7 @@ public class ProductService
         if (!string.IsNullOrWhiteSpace(query.SearchTerm))
         {
             var search = query.SearchTerm.ToLower();
-            products = _context.Products.Where(x => x.Name.ToLower().Contains(search));
+            products = products.Where(x => x.Name.Contains(search));
         }
 
         if (query.PageNumber <= 0)
@@ -34,7 +34,7 @@ public class ProductService
         if (query.PageSize > 50)
             query.PageSize = 50;
 
-        var totalCount = products.Count();
+        var totalCount = await products.CountAsync(cancellationToken);
         var pageNumber = query.PageNumber;
         var pageSize = query.ClampedPageSize;
         var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
