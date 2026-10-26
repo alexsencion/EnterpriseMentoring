@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using WarehouseManagement.Api.Domain.Entites;
+using WarehouseManagement.Api.DTOs;
 using WarehouseManagement.Api.Services;
 
 namespace WarehouseManagement.Api.Controllers
@@ -20,9 +21,9 @@ namespace WarehouseManagement.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetProducts()
+        public async Task<IActionResult> GetProducts([FromQuery] ProductQueryParameters query, CancellationToken cancellationToken = default)
         {
-            var result = await _service.GetProductsAsync();
+            var result = await _service.GetAllAsync(query, cancellationToken);
             return Ok(result);
         }
 

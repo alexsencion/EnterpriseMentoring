@@ -1,6 +1,6 @@
 using System;
 
-namespace WarehouseManagement.Api.Services;
+namespace WarehouseManagement.Api.DTOs;
 
 public class ProductStockResponse
 {
