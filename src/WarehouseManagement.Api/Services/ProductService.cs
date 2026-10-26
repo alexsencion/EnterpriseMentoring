@@ -1,6 +1,7 @@
 using System;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using WarehouseManagement.Api.Common;
 using WarehouseManagement.Api.Data;
 using WarehouseManagement.Api.Domain.Entites;
 using WarehouseManagement.Api.DTOs;
@@ -70,5 +71,36 @@ public class ProductService
             NewStockQuantity = product.StockQuantity
         };
         
+    }
+
+    public async Task<Result<ProductStockResponse>> AdjustStockAsync(int id, AdjustStockRequest request)
+    {
+        var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == id);
+        if (product == null)
+        {
+            _logger.LogWarning("User tries to adjust stock to a non-existant product.");
+            return Result<ProductStockResponse>.NotFound($"The product doesn't exist");
+        }
+
+        var newStock = product.StockQuantity + request.Quantity;
+        if (newStock < 0)
+            return Result<ProductStockResponse>.Failure($"Stock cannot fall below zero");
+
+        product.StockQuantity = newStock;
+
+        await _context.StockAdjustments.AddAsync(new StockAdjustmentLog
+        {
+            ProductId = product.Id,
+            QuantityAdjusted = request.Quantity,
+            Reason = request.Reason,
+            AdjustedAtUtc = DateTime.UtcNow
+        });
+
+        await _context.SaveChangesAsync();
+
+        return Result<ProductStockResponse>.Success(new ProductStockResponse
+        {
+            NewStockQuantity = newStock
+        });
     }
 }
