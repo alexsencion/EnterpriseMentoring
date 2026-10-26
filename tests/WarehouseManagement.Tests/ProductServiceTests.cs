@@ -1,4 +1,5 @@
 using System;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -222,5 +223,135 @@ public class ProductServiceTests
 
         var itemIds = result.Data.Select(p => p.ProductId).ToList();
         Assert.Equal(new[] { 6, 7, 8, 9, 10 }, itemIds);
+    }
+
+    [Fact]
+    public async Task AdjustStockAsync_PositiveNumber_IncreasesProductStock()
+    {
+       // Arrange
+        _connection = new SqliteConnection("DataSource=:memory:");
+        await _connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(_connection)
+            .Options;
+
+        using var context = new ApplicationDbContext(options);
+
+        await context.Database.EnsureCreatedAsync();
+
+        for (int i = 1; i <= 3; i++)
+        {
+            await context.Products.AddAsync(new Product
+            {
+                Id = i,
+                Name = $"product {i:D2}",
+                Sku = $"SKU-{i:D3}",
+                StockQuantity = 10
+            });
+        }
+        await context.SaveChangesAsync();
+
+        var service = new ProductService(context, _loggerMock.Object);
+
+        // Act
+
+        await service.AdjustStockAsync(1, new AdjustStockRequest
+        {
+            Quantity = 5,
+            Reason = "Testing"
+        });
+
+        var product = await context.Products.FindAsync(1);
+
+        // Assert
+        Assert.NotNull(product);
+        Assert.Equal(15, product.StockQuantity);
+    }
+
+    [Fact]
+    public async Task AdjustStockAsync_NegativeNumber_DecreasesProductStock()
+    {
+        // Arrange
+        _connection = new SqliteConnection("DataSource=:memory:");
+        await _connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(_connection)
+            .Options;
+
+        using var context = new ApplicationDbContext(options);
+
+        await context.Database.EnsureCreatedAsync();
+
+        for (int i = 1; i <= 3; i++)
+        {
+            await context.Products.AddAsync(new Product
+            {
+                Id = i,
+                Name = $"product {i:D2}",
+                Sku = $"SKU-{i:D3}",
+                StockQuantity = 10
+            });
+        }
+        await context.SaveChangesAsync();
+
+        var service = new ProductService(context, _loggerMock.Object);
+
+        // Act
+
+        await service.AdjustStockAsync(1, new AdjustStockRequest
+        {
+            Quantity = -5,
+            Reason = "Testing"
+        });
+
+        var product = await context.Products.FindAsync(1);
+
+        // Assert
+        Assert.NotNull(product);
+        Assert.Equal(5, product.StockQuantity);
+    }
+
+    [Fact]
+    public async Task AdjustStockAsync_BelowZero_ReturnsFailure()
+    {
+        // Arrange
+        _connection = new SqliteConnection("DataSource=:memory:");
+        await _connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(_connection)
+            .Options;
+
+        using var context = new ApplicationDbContext(options);
+
+        await context.Database.EnsureCreatedAsync();
+
+        for (int i = 1; i <= 3; i++)
+        {
+            await context.Products.AddAsync(new Product
+            {
+                Id = i,
+                Name = $"product {i:D2}",
+                Sku = $"SKU-{i:D3}",
+                StockQuantity = 10
+            });
+        }
+        await context.SaveChangesAsync();
+
+        var service = new ProductService(context, _loggerMock.Object);
+
+        // Act
+
+        var result = await service.AdjustStockAsync(1, new AdjustStockRequest
+        {
+            Quantity = -50,
+            Reason = "Testing"
+        });
+
+        // Assert
+        Assert.Equal(400, result.StatusCode);
+        Assert.False(result.IsSuccess);   
     }
 }

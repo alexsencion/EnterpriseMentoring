@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using WarehouseManagement.Api.Common;
 using WarehouseManagement.Api.Domain.Entites;
 using WarehouseManagement.Api.DTOs;
 using WarehouseManagement.Api.Services;
@@ -21,6 +22,7 @@ namespace WarehouseManagement.Api.Controllers
         }
 
         [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<IActionResult> GetProducts([FromQuery] ProductQueryParameters query, CancellationToken cancellationToken = default)
         {
             var result = await _service.GetAllAsync(query, cancellationToken);
@@ -47,5 +49,27 @@ namespace WarehouseManagement.Api.Controllers
                 return BadRequest();
             }
         }
+
+        [HttpPost("{productId:int}/adjust")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<Result<ProductStockResponse>>> AdjustStock(int productId, AdjustStockRequest request)
+        {
+            var result = await _service.AdjustStockAsync(productId, request);
+            
+            if (result.StatusCode == 400)
+            {
+                return BadRequest();
+            }
+
+            if (result.StatusCode == 404)
+            {
+                return NotFound();
+            }
+
+            return result;
+        }
+
     }
 }
