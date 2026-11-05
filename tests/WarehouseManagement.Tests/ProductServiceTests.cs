@@ -255,12 +255,13 @@ public class ProductServiceTests
         var service = new ProductService(context, _loggerMock.Object);
 
         // Act
+        CancellationToken cancellationToken = default;
 
         await service.AdjustStockAsync(1, new AdjustStockRequest
         {
             Quantity = 5,
             Reason = "Testing"
-        });
+        }, cancellationToken);
 
         var product = await context.Products.FindAsync(1);
 
@@ -299,12 +300,13 @@ public class ProductServiceTests
         var service = new ProductService(context, _loggerMock.Object);
 
         // Act
+        CancellationToken cancellationToken = default;
 
         await service.AdjustStockAsync(1, new AdjustStockRequest
         {
             Quantity = -5,
             Reason = "Testing"
-        });
+        }, cancellationToken);
 
         var product = await context.Products.FindAsync(1);
 
@@ -343,15 +345,73 @@ public class ProductServiceTests
         var service = new ProductService(context, _loggerMock.Object);
 
         // Act
+        CancellationToken cancellationToken = default;
 
         var result = await service.AdjustStockAsync(1, new AdjustStockRequest
         {
             Quantity = -50,
             Reason = "Testing"
-        });
+        }, cancellationToken);
 
         // Assert
         Assert.Equal(400, result.StatusCode);
         Assert.False(result.IsSuccess);   
+    }
+
+    [Fact]
+    public async Task Create_DuplicateProduct_Returns409()
+    {
+        // Arrange
+        _connection = new SqliteConnection("DataSource=:memory:");
+        await _connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(_connection)
+            .Options;
+
+        // Setup initial database state
+        using (var setupContext = new ApplicationDbContext(options))
+        {
+            await setupContext.Database.EnsureCreatedAsync();
+            await setupContext.Products.AddAsync(new Product
+            {
+                Id = 1,
+                Name = "Laptop",
+                Sku = "SKU-LAPTOP",
+                StockQuantity = 10
+            });
+            await setupContext.SaveChangesAsync();
+        }
+
+        using var contextA = new ApplicationDbContext(options);
+        using var contextB = new ApplicationDbContext(options);
+
+        var serviceA = new ProductService(contextA, _loggerMock.Object);
+        var serviceB = new ProductService(contextB, _loggerMock.Object);
+
+        CancellationToken cancellationToken = default;
+
+        // Act
+        var firstAdjustmentResult = await serviceA.AdjustStockAsync(1, new AdjustStockRequest
+        {
+            Quantity = -2,
+            Reason = "Sold one"
+        }, cancellationToken);
+
+        Assert.True(firstAdjustmentResult.IsSuccess);
+
+        var conflictingdjustmentResult = await serviceB.AdjustStockAsync(1, new AdjustStockRequest
+        {
+            Quantity = -3,
+            Reason = "Sold another"
+        }, cancellationToken);
+
+        Assert.True(conflictingdjustmentResult.IsSuccess);
+        
+        // Assert
+        using var verifyContext = new ApplicationDbContext(options);
+        var finalProduct = await verifyContext.Products.FindAsync(1);
+
+        Assert.Equal(5, finalProduct?.StockQuantity);
     }
 }

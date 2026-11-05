@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using WarehouseManagement.Api.Common;
@@ -73,34 +74,58 @@ public class ProductService
         
     }
 
-    public async Task<Result<ProductStockResponse>> AdjustStockAsync(int id, AdjustStockRequest request)
+    public async Task<Result<ProductStockResponse>> AdjustStockAsync(int id, AdjustStockRequest request, CancellationToken cancellationToken)
     {
-        var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == id);
-        if (product == null)
+        const int maxRetries = 3;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
-            _logger.LogWarning("User tries to adjust stock to a non-existant product.");
-            return Result<ProductStockResponse>.NotFound($"The product doesn't exist");
+            try
+            {
+                var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == id);
+                if (product == null)
+                {
+                    _logger.LogWarning("User tries to adjust stock to a non-existant product.");
+                    return Result<ProductStockResponse>.NotFound($"The product doesn't exist");
+                }
+
+                var newStock = product.StockQuantity + request.Quantity;
+                if (newStock < 0)
+                    return Result<ProductStockResponse>.Failure($"Stock cannot fall below zero");
+
+                product.StockQuantity = newStock;
+                product.RowVersion = Guid.NewGuid();
+
+                await _context.StockAdjustments.AddAsync(new StockAdjustmentLog
+                {
+                    ProductId = product.Id,
+                    QuantityAdjusted = request.Quantity,
+                    Reason = request.Reason,
+                    AdjustedAtUtc = DateTime.UtcNow
+                }, cancellationToken);
+
+                await _context.SaveChangesAsync(cancellationToken);
+
+                return Result<ProductStockResponse>.Success(new ProductStockResponse
+                {
+                    NewStockQuantity = newStock
+                });
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                _logger.LogWarning(ex, "Concurrency conflict detected on Product ID {ProductId}. Attempt {Attempt} of {MaxRetries}.", id, attempt, maxRetries);
+
+                if (attempt == maxRetries)
+                {
+                    return Result<ProductStockResponse>.Conflict("The product was modified by another user. Please try again.");
+                }
+
+                _context.ChangeTracker.Clear();
+
+                await Task.Delay(50 * attempt, cancellationToken);
+            }
         }
 
-        var newStock = product.StockQuantity + request.Quantity;
-        if (newStock < 0)
-            return Result<ProductStockResponse>.Failure($"Stock cannot fall below zero");
-
-        product.StockQuantity = newStock;
-
-        await _context.StockAdjustments.AddAsync(new StockAdjustmentLog
-        {
-            ProductId = product.Id,
-            QuantityAdjusted = request.Quantity,
-            Reason = request.Reason,
-            AdjustedAtUtc = DateTime.UtcNow
-        });
-
-        await _context.SaveChangesAsync();
-
-        return Result<ProductStockResponse>.Success(new ProductStockResponse
-        {
-            NewStockQuantity = newStock
-        });
+        return Result<ProductStockResponse>.Conflict("Could not complete the adjustment due to high contention.");
     }
 }

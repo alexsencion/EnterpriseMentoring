@@ -54,9 +54,9 @@ namespace WarehouseManagement.Api.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<Result<ProductStockResponse>>> AdjustStock(int productId, AdjustStockRequest request)
+        public async Task<ActionResult<Result<ProductStockResponse>>> AdjustStock(int productId, AdjustStockRequest request, CancellationToken cancellationToken = default)
         {
-            var result = await _service.AdjustStockAsync(productId, request);
+            var result = await _service.AdjustStockAsync(productId, request, cancellationToken);
             
             if (result.StatusCode == 400)
             {
