@@ -22,4 +22,7 @@ public class Result<T>
 
     public static Result<T> NotFound(string error = "Resource not found.") =>
         new () { IsSuccess = false, Error = error, StatusCode = 404 };
+
+    public static Result<T> Conflict(string error) =>
+    new () { IsSuccess = false, Error = error, StatusCode = 409 };
 }
